@@ -1,5 +1,8 @@
 //! Data structures and helpers for writing subgraph changes to the store
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use crate::{
     blockchain::{block_stream::FirehoseCursor, BlockPtr, BlockTime},
@@ -144,9 +147,10 @@ impl EntityModification {
     }
 
     pub fn creates_entity(&self) -> bool {
+        use EntityModification::*;
         match self {
-            EntityModification::Insert { .. } => true,
-            EntityModification::Overwrite { .. } | EntityModification::Remove { .. } => false,
+            Insert { .. } => true,
+            Overwrite { .. } | Remove { .. } => false,
         }
     }
 
@@ -300,6 +304,10 @@ pub struct RowGroup {
     rows: Vec<EntityModification>,
 
     immutable: bool,
+
+    /// Map the `key.entity_id` of all entries in `rows` to the index with
+    /// the most recent entry for that id to speed up lookups
+    last_mod: HashMap<Id, usize>,
 }
 
 impl RowGroup {
@@ -308,6 +316,7 @@ impl RowGroup {
             entity_type,
             rows: Vec::new(),
             immutable,
+            last_mod: HashMap::new(),
         }
     }
 
@@ -364,33 +373,22 @@ impl RowGroup {
     }
 
     pub fn last_op(&self, key: &EntityKey, at: BlockNumber) -> Option<EntityOp<'_>> {
-        self.rows
-            .iter()
-            // We are scanning backwards, i.e., in descendng order of
-            // `emod.block()`. Therefore, the first `emod` we encounter
-            // whose block is before `at` is the one in effect
-            .rfind(|emod| emod.key() == key && emod.block() <= at)
-            .map(|emod| emod.as_entity_op(at))
+        let idx = *self.last_mod.get(&key.entity_id)?;
+        self.rows.get(idx).map(|emod| emod.as_entity_op(at))
     }
 
     pub fn effective_ops(&self, at: BlockNumber) -> impl Iterator<Item = EntityOp<'_>> {
-        let mut seen = HashSet::new();
-        self.rows
+        self.last_mod
             .iter()
-            .rev()
-            .filter(move |emod| {
-                if emod.block() <= at {
-                    seen.insert(emod.id())
-                } else {
-                    false
-                }
-            })
+            .map(|(_, idx)| &self.rows[*idx])
+            .filter(move |emod| emod.block() <= at)
             .map(move |emod| emod.as_entity_op(at))
     }
 
     /// Find the most recent entry for `id`
     fn prev_row_mut(&mut self, id: &Id) -> Option<&mut EntityModification> {
-        self.rows.iter_mut().rfind(|emod| emod.id() == id)
+        let idx = *self.last_mod.get(id)?;
+        self.rows.get_mut(idx)
     }
 
     /// Append `row` to `self.rows` by combining it with a previously
@@ -423,6 +421,14 @@ impl RowGroup {
                 ));
             }
 
+            if row.id() != prev_row.id() {
+                return Err(constraint_violation!(
+                    "last_mod map is corrupted: got id {} looking up id {}",
+                    prev_row.id(),
+                    row.id()
+                ));
+            }
+
             // The heart of the matter: depending on what `row` is, clamp
             // `prev_row` and either ignore `row` since it is not needed, or
             // turn it into an `Insert`, which also does not require
@@ -452,13 +458,16 @@ impl RowGroup {
                     Overwrite { block, .. },
                 ) => {
                     prev_row.clamp(*block)?;
-                    self.rows.push(row.as_insert(&self.entity_type)?);
+                    let row = row.as_insert(&self.entity_type)?;
+                    self.last_mod.insert(row.id().clone(), self.rows.len());
+                    self.rows.push(row);
                 }
                 (Insert { end: None, .. } | Overwrite { end: None, .. }, Remove { block, .. }) => {
                     prev_row.clamp(*block)?;
                 }
             }
         } else {
+            self.last_mod.insert(row.id().clone(), self.rows.len());
             self.rows.push(row);
         }
         Ok(())
@@ -919,6 +928,7 @@ impl<'a> Iterator for WriteChunkIter<'a> {
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashMap;
     use std::sync::Arc;
 
     use crate::{
@@ -942,7 +952,7 @@ mod test {
 
         assert_eq!(values.len(), blocks.len());
 
-        let rows = values
+        let rows: Vec<_> = values
             .iter()
             .zip(blocks.iter())
             .map(|(value, block)| EntityModification::Remove {
@@ -950,10 +960,19 @@ mod test {
                 block: *block,
             })
             .collect();
+        let last_mod = rows
+            .iter()
+            .enumerate()
+            .fold(HashMap::new(), |mut map, (idx, emod)| {
+                map.insert(emod.id().clone(), idx);
+                map
+            });
+
         let group = RowGroup {
             entity_type: ENTRY_TYPE.clone(),
             rows,
             immutable: false,
+            last_mod,
         };
         let act = group
             .clamps_by_block()
