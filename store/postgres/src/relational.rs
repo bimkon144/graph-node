@@ -1109,6 +1109,7 @@ pub enum ColumnType {
     Bytes,
     Int,
     Int8,
+    Timestamp,
     String,
     TSVector(FulltextConfig),
     Enum(EnumType),
@@ -1172,6 +1173,7 @@ impl ColumnType {
             ValueType::Bytes => Ok(ColumnType::Bytes),
             ValueType::Int => Ok(ColumnType::Int),
             ValueType::Int8 => Ok(ColumnType::Int8),
+            ValueType::Timestamp => Ok(ColumnType::Timestamp),
             ValueType::String => Ok(ColumnType::String),
         }
     }
@@ -1184,6 +1186,7 @@ impl ColumnType {
             ColumnType::Bytes => "bytea",
             ColumnType::Int => "int4",
             ColumnType::Int8 => "int8",
+            ColumnType::Timestamp => "timestamptz",
             ColumnType::String => "text",
             ColumnType::TSVector(_) => "tsvector",
             ColumnType::Enum(enum_type) => enum_type.name.as_str(),

@@ -1017,7 +1017,7 @@
                 "description": null,
                 "type": {
                   "kind": "INPUT_OBJECT",
-                  "name": "Node_filter",
+                  "name": "Block_height",
                   "ofType": null
                 },
                 "defaultValue": null
@@ -1510,7 +1510,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "ENUM",
-                  "name": "Role",
+                  "name": "User_orderBy",
                   "ofType": null
                 }
               }
