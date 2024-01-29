@@ -23,11 +23,14 @@ use graph::data_source::{
     offchain, CausalityRegion, DataSource, DataSourceCreationError, TriggerData,
 };
 use graph::env::EnvVars;
+use graph::indexer::store::{SledIndexerStore, SledStoreError, StateSnapshotFrequency, DB_NAME};
+use graph::indexer::{IndexWorker, IndexerContext};
 use graph::prelude::*;
 use graph::schema::EntityKey;
 use graph::util::{backoff::ExponentialBackoff, lfu_cache::LfuCache};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use uniswap::UniswapTransform;
 
 const MINUTE: Duration = Duration::from_secs(60);
 
@@ -197,10 +200,48 @@ where
         loop {
             debug!(self.logger, "Starting or restarting subgraph");
 
-            let block_stream_canceler = CancelGuard::new();
-            let block_stream_cancel_handle = block_stream_canceler.handle();
+            // let db = Arc::new(sled::open(DB_NAME).map_err(SledStoreError::from).unwrap());
+            // let store = Arc::new(
+            //     SledIndexerStore::new(
+            //         db,
+            //         self.inputs.deployment.hash.as_str(),
+            //         StateSnapshotFrequency::Never,
+            //     )
+            //     .unwrap(),
+            // );
+
+            // let ctx = Arc::new(IndexerContext {
+            //     chain: self.inputs.chain.clone(),
+            //     transform: Arc::new(UniswapTransform::new()),
+            //     store,
+            //     deployment: self.inputs.deployment.clone(),
+            // });
+
+            // let iw = IndexWorker {};
+
             // TriggerFilter needs to be rebuilt eveytime the blockstream is restarted
             self.ctx.filter = Some(self.build_filter());
+
+            // let earlier = Instant::now();
+            // iw.run_many(
+            //     ctx,
+            //     self.inputs.store.clone(),
+            //     *self.inputs.start_blocks.iter().min().unwrap(),
+            //     // Some(13369621),
+            //     None,
+            //     Arc::new(self.ctx.filter.as_ref().unwrap().clone()),
+            //     self.inputs.unified_api_version.clone(),
+            //     40,
+            // )
+            // .await
+            // .unwrap();
+            // let diff = Instant::now().duration_since(earlier);
+            // println!("### All tasks finished: took {}s ###", diff.as_secs());
+
+            // panic!("finished ingesting data");
+
+            let block_stream_canceler = CancelGuard::new();
+            let block_stream_cancel_handle = block_stream_canceler.handle();
 
             let mut block_stream = new_block_stream(
                 &self.inputs,
