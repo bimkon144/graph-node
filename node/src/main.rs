@@ -123,7 +123,7 @@ async fn main() {
     // Log version information
     info!(
         logger,
-        "Graph Node version: {}",
+        "Graph Node (BD1) version : {}",
         render_testament!(TESTAMENT)
     );
 
