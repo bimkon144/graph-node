@@ -9,7 +9,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use sled::{Db, Tree};
 use thiserror::Error;
 
-use super::{BlockSender, EncodedTriggers, IndexerStore, State, StateDelta};
+use crate::indexer::{BlockSender, EncodedTriggers, IndexerStore, State, StateDelta};
 pub const DB_NAME: &str = "/media/data/sled_indexer_db";
 pub const STATE_SNAPSHOT_FREQUENCY: u32 = 1000;
 pub const TRIGGER_PREFIX: &str = "trigger_";
