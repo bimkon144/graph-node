@@ -699,10 +699,6 @@ impl ToSql<diesel::sql_types::Binary, diesel::pg::Pg> for Bytes {
 pub struct Timestamp(DateTime<Utc>);
 
 impl Timestamp {
-    pub fn timestamp(&self) -> i64 {
-        self.0.timestamp_millis()
-    }
-
     pub fn from_rfc3339(v: &str) -> Result<Self, chrono::ParseError> {
         Ok(Timestamp(DateTime::parse_from_rfc3339(v)?.into()))
     }

@@ -351,6 +351,10 @@ impl Value {
             ("Int8", Value::Int(num)) => Ok(Value::String(num.to_string())),
             ("Int8", Value::String(num)) => Ok(Value::String(num)),
             ("Timestamp", Value::Int(ts)) => Ok(Value::Int(ts)),
+            ("Timestamp", Value::String(ts_str)) => match ts_str.parse::<i64>() {
+                Ok(ts) => Ok(Value::Int(ts)),
+                Err(_) => Err(Value::String(ts_str)),
+            },
             ("String", Value::String(s)) => Ok(Value::String(s)),
             ("ID", Value::String(s)) => Ok(Value::String(s)),
             ("ID", Value::Int(n)) => Ok(Value::String(n.to_string())),

@@ -369,7 +369,7 @@ impl FromColumnValue for r::Value {
 
     fn from_timestamp(i: &str) -> Result<Self, StoreError> {
         scalar::Timestamp::from_rfc3339(i)
-            .map(|v| r::Value::String(v.as_millis_since_epoch().to_string()))
+            .map(|v| r::Value::Int(v.as_millis_since_epoch()))
             .map_err(|e| {
                 StoreError::Unknown(anyhow!("failed to convert {} to Timestamp: {}", i, e))
             })
