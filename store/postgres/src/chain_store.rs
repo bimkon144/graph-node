@@ -3,6 +3,7 @@ use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
 use diesel::sql_types::Text;
 use diesel::{insert_into, update};
+use graph::components::store::CallResult;
 use graph::env::ENV_VARS;
 use graph::parking_lot::RwLock;
 use graph::prelude::MetricsRegistry;
@@ -2310,7 +2311,7 @@ impl EthereumCallCache for ChainStore {
         contract_address: ethabi::Address,
         encoded_call: &[u8],
         block: BlockPtr,
-    ) -> Result<Option<Vec<u8>>, Error> {
+    ) -> Result<Option<CallResult>, Error> {
         let id = contract_call_id(&contract_address, encoded_call, &block);
         let conn = &*self.get_conn()?;
         if let Some(call_output) = conn.transaction::<_, Error, _>(|| {
@@ -2326,7 +2327,7 @@ impl EthereumCallCache for ChainStore {
                 Ok(None)
             }
         })? {
-            Ok(Some(call_output))
+            Ok(Some(CallResult::Value(call_output)))
         } else {
             Ok(None)
         }
@@ -2342,8 +2343,15 @@ impl EthereumCallCache for ChainStore {
         contract_address: ethabi::Address,
         encoded_call: &[u8],
         block: BlockPtr,
-        return_value: &[u8],
+        return_value: CallResult,
     ) -> Result<(), Error> {
+        let CallResult::Value(return_value) = return_value else {
+            // We do not want to cache unsuccessful calls as some RPC nodes
+            // have weird behavior near the chain head. The details are lost
+            // to time, but we had issues with some RPC clients in the past
+            // where calls first failed and later succeeded
+            return Ok(());
+        };
         let id = contract_call_id(&contract_address, encoded_call, &block);
         let conn = &*self.get_conn()?;
         conn.transaction(|| {
@@ -2352,7 +2360,7 @@ impl EthereumCallCache for ChainStore {
                 id.as_ref(),
                 contract_address.as_ref(),
                 block.number,
-                return_value,
+                &return_value,
             )
         })
     }
