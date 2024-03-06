@@ -416,15 +416,18 @@ impl Value {
                     INT8_SCALAR => Value::Int8(s.parse::<i64>().map_err(|_| {
                         QueryExecutionError::ValueParseError("Int8".to_string(), format!("{}", s))
                     })?),
+                    TIMESTAMP_SCALAR => {
+                        Value::Timestamp(scalar::Timestamp::from_rfc3339(s).map_err(|_| {
+                            QueryExecutionError::ValueParseError(
+                                "Timestamp".to_string(),
+                                format!("{}", s),
+                            )
+                        })?)
+                    }
                     _ => Value::String(s.clone()),
                 }
             }
-            (r::Value::Int(i), NamedType(n)) => match n.as_str() {
-                TIMESTAMP_SCALAR => {
-                    Value::Timestamp(scalar::Timestamp::from_millisecs_since_epoch(*i))
-                }
-                _ => Value::Int(*i as i32),
-            },
+            (r::Value::Int(i), _) => Value::Int(*i as i32),
             (r::Value::Boolean(b), _) => Value::Bool(b.to_owned()),
             (r::Value::Null, _) => Value::Null,
             _ => {
@@ -601,7 +604,7 @@ impl From<Value> for q::Value {
             Value::String(s) => q::Value::String(s),
             Value::Int(i) => q::Value::Int(q::Number::from(i)),
             Value::Int8(i) => q::Value::String(i.to_string()),
-            Value::Timestamp(i) => q::Value::String(i.as_millis_since_epoch().to_string()),
+            Value::Timestamp(ts) => q::Value::String(ts.as_millis_since_epoch().to_string()),
             Value::BigDecimal(d) => q::Value::String(d.to_string()),
             Value::Bool(b) => q::Value::Boolean(b),
             Value::Null => q::Value::Null,
@@ -620,7 +623,7 @@ impl From<Value> for r::Value {
             Value::String(s) => r::Value::String(s),
             Value::Int(i) => r::Value::Int(i as i64),
             Value::Int8(i) => r::Value::String(i.to_string()),
-            Value::Timestamp(i) => r::Value::Int(i.as_millis_since_epoch()),
+            Value::Timestamp(i) => r::Value::String(i.as_millis_since_epoch().to_string()),
             Value::BigDecimal(d) => r::Value::String(d.to_string()),
             Value::Bool(b) => r::Value::Boolean(b),
             Value::Null => r::Value::Null,
