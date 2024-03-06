@@ -2116,6 +2116,10 @@ impl ChainStoreTrait for ChainStore {
         })
         .await
     }
+
+    fn chain_identifier(&self) -> &ChainIdentifier {
+        &self.chain_identifier
+    }
 }
 
 mod recent_blocks_cache {
