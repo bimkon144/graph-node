@@ -1,4 +1,5 @@
 use graph::blockchain::{Block, BlockTime};
+use graph::data::store::scalar::Timestamp;
 use graph::data::subgraph::schema::DeploymentCreate;
 use graph::data::subgraph::LATEST_VERSION;
 use graph::entity;
@@ -460,12 +461,13 @@ async fn insert_test_entities(
     let is = &manifest.schema;
     let pub1 = &*PUB1;
     let ts0 = BlockTime::for_test(&BLOCKS[0]);
+    let timestamp = Timestamp::from_millisecs_since_epoch(679736164000);
     let entities0 = vec![
         (
             "Musician",
             vec![
-                entity! { is => id: "m1", name: "John", mainBand: "b1", bands: vec!["b1", "b2"], favoriteCount: 10, birthDate: 679736164000 as i64 },
-                entity! { is => id: "m2", name: "Lisa", mainBand: "b1", bands: vec!["b1"], favoriteCount: 100, birthDate: 679736164000 as i64 },
+                entity! { is => id: "m1", name: "John", mainBand: "b1", bands: vec!["b1", "b2"], favoriteCount: 10, birthDate: timestamp.clone() },
+                entity! { is => id: "m2", name: "Lisa", mainBand: "b1", bands: vec!["b1"], favoriteCount: 100, birthDate: timestamp.clone() },
             ],
         ),
         ("Publisher", vec![entity! { is => id: pub1 }]),
@@ -571,8 +573,8 @@ async fn insert_test_entities(
     let entities1 = vec![(
         "Musician",
         vec![
-            entity! { is => id: "m3", name: "Tom", mainBand: "b2", bands: vec!["b1", "b2"], favoriteCount: 5, birthDate: 679736164000 as i64 },
-            entity! { is => id: "m4", name: "Valerie", bands: Vec::<String>::new(), favoriteCount: 20, birthDate: 679736164000 as i64 },
+            entity! { is => id: "m3", name: "Tom", mainBand: "b2", bands: vec!["b1", "b2"], favoriteCount: 5, birthDate: timestamp.clone() },
+            entity! { is => id: "m4", name: "Valerie", bands: Vec::<String>::new(), favoriteCount: 20, birthDate: timestamp.clone() },
         ],
     )];
     let entities1 = insert_ops(&manifest.schema, entities1);

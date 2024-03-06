@@ -657,6 +657,12 @@ impl From<scalar::Bytes> for Value {
     }
 }
 
+impl From<scalar::Timestamp> for Value {
+    fn from(value: scalar::Timestamp) -> Value {
+        Value::Timestamp(value)
+    }
+}
+
 impl From<bool> for Value {
     fn from(value: bool) -> Value {
         Value::Bool(value)
