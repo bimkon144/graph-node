@@ -416,12 +416,6 @@ impl Value {
                     INT8_SCALAR => Value::Int8(s.parse::<i64>().map_err(|_| {
                         QueryExecutionError::ValueParseError("Int8".to_string(), format!("{}", s))
                     })?),
-                    TIMESTAMP_SCALAR => Value::Timestamp(s.parse().map_err(|_| {
-                        QueryExecutionError::ValueParseError(
-                            "Timestamp".to_string(),
-                            format!("{}", s),
-                        )
-                    })?),
                     _ => Value::String(s.clone()),
                 }
             }
@@ -626,7 +620,7 @@ impl From<Value> for r::Value {
             Value::String(s) => r::Value::String(s),
             Value::Int(i) => r::Value::Int(i as i64),
             Value::Int8(i) => r::Value::String(i.to_string()),
-            Value::Timestamp(i) => r::Value::String(i.timestamp().to_string()),
+            Value::Timestamp(i) => r::Value::Int(i.timestamp()),
             Value::BigDecimal(d) => r::Value::String(d.to_string()),
             Value::Bool(b) => r::Value::Boolean(b),
             Value::Null => r::Value::Null,

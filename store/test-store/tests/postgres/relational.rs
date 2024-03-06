@@ -194,7 +194,7 @@ lazy_static! {
             bool: true,
             int: std::i32::MAX,
             int8: std::i64::MAX,
-            timestamp: Value::Timestamp(Timestamp::from_str("679736164000").unwrap()),
+            timestamp: Value::Timestamp(Timestamp::from_millisecs_since_epoch(679736164000).unwrap()),
             bigDecimal: decimal.clone(),
             bigDecimalArray: vec![decimal.clone(), (decimal + 1.into())],
             string: "scalar",

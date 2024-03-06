@@ -741,16 +741,6 @@ impl stable_hash_legacy::StableHash for Timestamp {
     }
 }
 
-impl FromStr for Timestamp {
-    type Err = chrono::ParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let numeric_value = s.parse::<i64>().expect("invalid input for timestamp");
-
-        Ok(Timestamp::from_millisecs_since_epoch(numeric_value))
-    }
-}
-
 impl Display for Timestamp {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
         write!(f, "{}", self.as_millis_since_epoch())
