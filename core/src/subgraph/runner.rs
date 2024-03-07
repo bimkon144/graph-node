@@ -619,7 +619,7 @@ where
             ) {
                 Ok(()) => (),
                 Err(e) => {
-                    error!(logger, "Failed to gas metrics to object store"; "error" => e.to_string())
+                    error!(logger, "Failed to upload DIPS metrics"; "error" => e.to_string())
                 }
             }
         }

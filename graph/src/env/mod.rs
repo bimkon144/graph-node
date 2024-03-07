@@ -188,7 +188,7 @@ pub struct EnvVars {
     pub subgraph_settings: Option<String>,
     /// Whether to prefer substreams blocks streams over firehose when available.
     pub prefer_substreams_block_streams: bool,
-    /// Set by the flag `GRAPH_ENABLE_GAS_METRICS`. Whether to enable
+    /// Set by the flag `GRAPH_ENABLE_DIPS_METRICS`. Whether to enable
     /// gas metrics. Off by default.
     pub enable_dips_metrics: bool,
     /// Set by the env var `GRAPH_HISTORY_BLOCKS_OVERRIDE`. Defaults to None

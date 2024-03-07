@@ -4,8 +4,10 @@ mod ops;
 mod saturating;
 mod size_of;
 use crate::components::metrics::gas::GasMetrics;
+use crate::components::store::Entity;
 use crate::prelude::{CheapClone, ENV_VARS};
 use crate::runtime::DeterministicHostError;
+use crate::schema::EntityType;
 pub use combinators::*;
 pub use costs::DEFAULT_BASE_COST;
 pub use costs::*;
@@ -133,6 +135,24 @@ impl GasCounter {
         method: &str,
     ) -> Result<(), DeterministicHostError> {
         self.consume_host_fn_inner(amount, Some(method))
+    }
+
+    pub fn track_entity_read(&self, entity_type: &EntityType, entity: &Entity) {
+        if ENV_VARS.enable_dips_metrics {
+            self.metrics.track_entity_read(entity_type, entity);
+        }
+    }
+
+    pub fn track_entity_reads(&self, entity_type: &EntityType, entities: &[Entity]) {
+        if ENV_VARS.enable_dips_metrics {
+            self.metrics.track_entity_read_batch(entity_type, entities);
+        }
+    }
+
+    pub fn track_entity_write(&self, entity_type: &EntityType, entity: &Entity) {
+        if ENV_VARS.enable_dips_metrics {
+            self.metrics.track_entity_write(entity_type, entity);
+        }
     }
 
     pub fn get(&self) -> Gas {
