@@ -609,17 +609,17 @@ where
             return Err(BlockProcessingError::Canceled);
         }
 
-        // Spawns a task to upload gas metrics to GCS, enabled via ENV_VARS.enable_gas_metrics.
+        // Spawns a task to upload gas metrics to object store, enabled via ENV_VARS.enable_dips_metrics.
         // Logs errors without interrupting block processing.
-        if ENV_VARS.enable_gas_metrics {
-            match self.metrics.host.gas_metrics.flush_metrics_to_gcs(
+        if ENV_VARS.enable_dips_metrics {
+            match self.metrics.host.gas_metrics.flush_metrics_to_store(
                 &logger,
                 block_ptr,
                 self.inputs.deployment.id,
             ) {
                 Ok(()) => (),
                 Err(e) => {
-                    error!(logger, "Failed to gas metrics to GCS"; "error" => e.to_string())
+                    error!(logger, "Failed to gas metrics to object store"; "error" => e.to_string())
                 }
             }
         }

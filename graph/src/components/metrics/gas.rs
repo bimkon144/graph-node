@@ -2,12 +2,15 @@ use crate::blockchain::BlockPtr;
 use crate::components::store::DeploymentId;
 use crate::env::ENV_VARS;
 use crate::spawn;
-use anyhow::Result;
-use cloud_storage::{Bucket, Object};
+use anyhow::{anyhow, Result};
 use csv::Writer;
+use object_store::gcp::GoogleCloudStorageBuilder;
+use object_store::path::Path;
+use object_store::ObjectStore;
 use slog::{error, info, Logger};
 use std::sync::RwLock;
 use std::{collections::HashMap, sync::Arc};
+use url::Url;
 
 pub struct GasMetrics {
     pub gas_counter: Arc<RwLock<HashMap<String, u64>>>,
@@ -35,22 +38,26 @@ impl GasMetrics {
         Ok(String::from_utf8(wtr.into_inner()?)?)
     }
 
-    async fn write_csv_to_gcs(bucket_name: &str, path: &str, data: String) -> Result<()> {
-        let bucket = Bucket::read(bucket_name).await?;
-
+    async fn write_csv_to_store(bucket: &str, path: &str, data: String) -> Result<()> {
         let data_bytes = data.into_bytes();
 
-        let _ = Object::create(&bucket.name, data_bytes, path, "text/csv").await?;
+        let bucket =
+            Url::parse(&bucket).map_err(|e| anyhow!("Failed to parse bucket url: {}", e))?;
+        let store = GoogleCloudStorageBuilder::from_env()
+            .with_url(bucket)
+            .build()?;
+
+        store.put(&Path::parse(path)?, data_bytes.into()).await?;
 
         Ok(())
     }
 
-    /// Flushes gas and op metrics to GCS asynchronously, clearing metrics maps afterward.
+    /// Flushes gas and op metrics to an object storage asynchronously, clearing metrics maps afterward.
     ///
-    /// Serializes metrics to CSV and spawns tasks for GCS upload, logging successes or errors.
-    /// Metrics are organized by block number and subgraph ID in the GCS bucket.
+    /// Serializes metrics to CSV and spawns tasks for object storage upload, logging successes or errors.
+    /// Metrics are organized by block number and subgraph ID in the object storage bucket.
     /// Returns `Ok(())` to indicate the upload process has started.
-    pub fn flush_metrics_to_gcs(
+    pub fn flush_metrics_to_store(
         &self,
         logger: &Logger,
         block_ptr: BlockPtr,
@@ -59,33 +66,39 @@ impl GasMetrics {
         let logger = logger.clone();
         let gas_data = Self::map_to_csv(&self.gas_counter.read().unwrap())?;
         let op_data = Self::map_to_csv(&self.op_counter.read().unwrap())?;
+        let bucket = &ENV_VARS.dips_metrics_object_store_url;
 
-        spawn(async move {
-            let gas_file = format!("{}/gas/{}.csv", subgraph_id, block_ptr.number);
-            let op_file = format!("{}/op/{}.csv", subgraph_id, block_ptr.number);
+        match bucket {
+            Some(bucket) => {
+                spawn(async move {
+                    let gas_file = format!("{}/{}/gas.csv", subgraph_id, block_ptr.number);
+                    let op_file = format!("{}/{}/op.csv", subgraph_id, block_ptr.number);
 
-            let bucket = &ENV_VARS.gas_metrics_gcs_bucket;
+                    match Self::write_csv_to_store(bucket, &gas_file, gas_data).await {
+                        Ok(_) => {
+                            info!(
+                                logger,
+                                "Wrote gas metrics to object-store for block {}", block_ptr.number
+                            );
+                        }
+                        Err(e) => {
+                            error!(logger, "Error writing gas metrics to object-store: {}", e)
+                        }
+                    }
 
-            match Self::write_csv_to_gcs(bucket, &gas_file, gas_data).await {
-                Ok(_) => {
-                    info!(
-                        logger,
-                        "Wrote gas metrics to GCS for block {}", block_ptr.number
-                    );
-                }
-                Err(e) => error!(logger, "Error writing gas metrics to GCS: {}", e),
+                    match Self::write_csv_to_store(bucket, &op_file, op_data).await {
+                        Ok(_) => {
+                            info!(
+                                logger,
+                                "Wrote op metrics to object-store for block {}", block_ptr.number
+                            );
+                        }
+                        Err(e) => error!(logger, "Error writing op metrics to object-store: {}", e),
+                    }
+                });
             }
-
-            match Self::write_csv_to_gcs(bucket, &op_file, op_data).await {
-                Ok(_) => {
-                    info!(
-                        logger,
-                        "Wrote op metrics to GCS for block {}", block_ptr.number
-                    );
-                }
-                Err(e) => error!(logger, "Error writing op metrics to GCS: {}", e),
-            }
-        });
+            None => return Err(anyhow!("Failed to parse gas metrics object store URL"))?,
+        }
 
         // Clear the maps
         self.gas_counter.write().unwrap().clear();
