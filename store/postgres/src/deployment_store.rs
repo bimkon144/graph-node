@@ -9,7 +9,7 @@ use graph::blockchain::BlockTime;
 use graph::components::store::write::RowGroup;
 use graph::components::store::{
     Batch, DerivedEntityQuery, PrunePhase, PruneReporter, PruneRequest, PruningStrategy,
-    QueryPermit, StoredDynamicDataSource, VersionStats,
+    QueryPermit, StoredDynamicDataSource, SubgraphSegment, VersionStats,
 };
 use graph::components::versions::VERSIONS;
 use graph::data::query::Trace;
@@ -19,7 +19,7 @@ use graph::data_source::CausalityRegion;
 use graph::prelude::futures03::FutureExt;
 use graph::prelude::{
     ApiVersion, CancelHandle, CancelToken, CancelableError, EntityOperation, PoolWaitStats,
-    SubgraphDeploymentEntity,
+    SubgraphDeploymentEntity, TryFutureExt,
 };
 use graph::semver::Version;
 use graph::tokio::task::JoinHandle;
@@ -50,7 +50,7 @@ use crate::block_range::{BLOCK_COLUMN, BLOCK_RANGE_COLUMN};
 use crate::deployment::{self, OnSync};
 use crate::detail::ErrorDetail;
 use crate::dynds::DataSourcesTable;
-use crate::primary::DeploymentId;
+use crate::primary::{DeploymentId, SegmentDetails};
 use crate::relational::index::{CreateIndex, Method};
 use crate::relational::{Layout, LayoutCache, SqlName, Table};
 use crate::relational_queries::FromEntityData;
@@ -1105,10 +1105,26 @@ impl DeploymentStore {
             .map(|(entities, _)| entities)
     }
 
+    pub(crate) async fn create_subgraph_segments(
+        &self,
+
+        deployment: graph::components::store::DeploymentId,
+        segments: Vec<SegmentDetails>,
+    ) -> Result<Vec<SubgraphSegment>, StoreError> {
+        unimplemented!()
+    }
+    pub(crate) async fn subgraph_segments(
+        &self,
+        deployment: graph::components::store::DeploymentId,
+    ) -> Result<Vec<SubgraphSegment>, StoreError> {
+        unimplemented!()
+    }
+
     pub(crate) fn transact_block_operations(
         self: &Arc<Self>,
         logger: &Logger,
         site: Arc<Site>,
+        segment: &SubgraphSegment,
         batch: &Batch,
         last_rollup: Option<BlockTime>,
         stopwatch: &StopwatchMetrics,
@@ -1166,6 +1182,7 @@ impl DeploymentStore {
                 let earliest_block = deployment::transact_block(
                     &conn,
                     &site,
+                    segment,
                     &batch.block_ptr,
                     &batch.firehose_cursor,
                     count,

@@ -4,12 +4,7 @@ use anyhow::{anyhow, Context, Error};
 use graph::{
     blockchain,
     components::{link_resolver::LinkResolver, subgraph::InstanceDSTemplateInfo},
-    prelude::{
-        async_trait,
-        ethabi::Contract,
-        futures03::stream::{FuturesOrdered, FuturesUnordered},
-        BlockNumber, CheapClone, Link, TryStreamExt,
-    },
+    prelude::{async_trait, ethabi::Contract, BlockNumber, CheapClone, Link},
     slog::Logger,
 };
 

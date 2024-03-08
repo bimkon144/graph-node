@@ -101,14 +101,24 @@ pub struct TriggerMap(HashMap<BlockNumber, EncodedTriggers>);
 
 #[async_trait]
 /// Indexer store is the store where the triggers will be kept to be processed by subgraphs
-/// later. Only the latest state is kept and will be limited in size. State is not mandatory
-/// and will not be queryable outside the pre-Indexing process.
+/// later. The indexer store will be used to populate several logical segments of a dataset,
+/// therefore it can not assume to know the full state of the underlying storage at any time.
 pub trait IndexerStore: Sync + Send {
+    /// Last Stable Block (LSB) is the last block the rest of the system can use
+    /// for streaming, copying, whatever else.
     async fn get_last_stable_block(&self) -> Result<Option<BlockNumber>>;
+    /// Stream from will send all relevant blocks starting with bn inclusively up to
+    /// LSB, forever.
     async fn stream_from(&self, bn: BlockNumber, bs: BlockSender) -> Result<()>;
+    /// Get the triggers for a specific block.
     async fn get(&self, bn: BlockNumber) -> Result<Option<EncodedTriggers>>;
+    /// Set the triggers for a specific block. Set can be called in parallel for different
+    /// segments of the Indexer store, therefore, set can assume it will be forward-only within
+    /// a segment but not on the entirety of the data.
     async fn set(&self, bn: BlockPtr, state: &State, triggers: EncodedTriggers) -> Result<()>;
+    /// Get state is currently not implemented and will prolly be removed.
     async fn get_state(&self, bn: BlockNumber) -> Result<State>;
+    /// Sets the LSB, this block is set per deployment/store and not per segment.
     async fn set_last_stable_block(&self, bn: BlockNumber) -> Result<()>;
 }
 

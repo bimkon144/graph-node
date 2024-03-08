@@ -5,9 +5,12 @@ use std::sync::{Mutex, RwLock, TryLockError as RwLockError};
 use std::time::{Duration, Instant};
 use std::{collections::BTreeMap, sync::Arc};
 
+use diesel::RunQueryDsl;
 use graph::blockchain::block_stream::FirehoseCursor;
 use graph::blockchain::BlockTime;
-use graph::components::store::{Batch, DeploymentCursorTracker, DerivedEntityQuery, ReadStore};
+use graph::components::store::{
+    Batch, DeploymentCursorTracker, DerivedEntityQuery, ReadStore, SegmentDetails, SubgraphSegment,
+};
 use graph::constraint_violation;
 use graph::data::store::IdList;
 use graph::data::subgraph::schema;
@@ -36,7 +39,7 @@ use store::StoredDynamicDataSource;
 
 use crate::deployment_store::DeploymentStore;
 use crate::primary::DeploymentId;
-use crate::retry;
+use crate::{deployment, retry};
 use crate::{primary, primary::Site, relational::Layout, SubgraphStore};
 
 /// A wrapper around `SubgraphStore` that only exposes functions that are
@@ -151,6 +154,7 @@ struct SyncStore {
     store: WritableSubgraphStore,
     writable: Arc<DeploymentStore>,
     site: Arc<Site>,
+    segment: SubgraphSegment,
     input_schema: InputSchema,
     manifest_idx_and_name: Arc<Vec<(u32, String)>>,
     last_rollup: LastRollupTracker,
@@ -161,6 +165,7 @@ impl SyncStore {
         subgraph_store: SubgraphStore,
         logger: Logger,
         site: Arc<Site>,
+        segment: SubgraphSegment,
         manifest_idx_and_name: Arc<Vec<(u32, String)>>,
         block: Option<BlockNumber>,
     ) -> Result<Self, StoreError> {
@@ -182,6 +187,7 @@ impl SyncStore {
             input_schema,
             manifest_idx_and_name,
             last_rollup,
+            segment,
         })
     }
 
@@ -311,6 +317,7 @@ impl SyncStore {
             let event = self.writable.transact_block_operations(
                 &self.logger,
                 self.site.clone(),
+                &self.segment,
                 batch,
                 self.last_rollup.get(),
                 stopwatch,
@@ -1491,6 +1498,7 @@ impl WritableStore {
         subgraph_store: SubgraphStore,
         logger: Logger,
         site: Arc<Site>,
+        segment: SubgraphSegment,
         manifest_idx_and_name: Arc<Vec<(u32, String)>>,
         registry: Arc<MetricsRegistry>,
     ) -> Result<Self, StoreError> {
@@ -1503,6 +1511,7 @@ impl WritableStore {
                 subgraph_store,
                 logger.clone(),
                 site,
+                segment,
                 manifest_idx_and_name,
                 block_ptr.as_ref().map(|ptr| ptr.number),
             )
@@ -1577,6 +1586,30 @@ impl DeploymentCursorTracker for WritableStore {
 
 #[async_trait::async_trait]
 impl WritableStoreTrait for WritableStore {
+    async fn create_segments(
+        &self,
+        deployment: graph::components::store::DeploymentId,
+        segments: Vec<SegmentDetails>,
+    ) -> Result<Vec<SubgraphSegment>, StoreError> {
+        self.store
+            .writable
+            .create_subgraph_segments(
+                deployment.into(),
+                segments.into_iter().map(Into::into).collect(),
+            )
+            .await
+    }
+
+    async fn get_segments(
+        &self,
+        deployment: graph::components::store::DeploymentId,
+    ) -> Result<Vec<SubgraphSegment>, StoreError> {
+        self.store
+            .writable
+            .subgraph_segments(deployment.into())
+            .await
+    }
+
     async fn start_subgraph_deployment(&self, logger: &Logger) -> Result<(), StoreError> {
         let store = self.store.cheap_clone();
         let logger = logger.cheap_clone();
@@ -1744,7 +1777,12 @@ impl WritableStoreTrait for WritableStore {
             let store = Arc::new(self.store.store.0.clone());
             let manifest_idx_and_name = self.store.manifest_idx_and_name.cheap_clone();
             store
-                .writable(logger, self.store.site.id.into(), manifest_idx_and_name)
+                .writable(
+                    logger,
+                    self.store.site.id.into(),
+                    self.store.segment.clone(),
+                    manifest_idx_and_name,
+                )
                 .await
                 .map(|store| Some(store))
         } else {

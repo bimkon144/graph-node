@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use anyhow::Error;
 use graph::{
-    blockchain::{self, ChainIdentifier, HostFn},
-    prelude::{CheapClone, EthereumCallCache, ENV_VARS},
+    blockchain::{self, HostFn},
+    prelude::{CheapClone, EthereumCallCache},
 };
 use graph_chain_ethereum::{
     network::EthereumNetworkAdapters,
@@ -12,7 +12,6 @@ use graph_chain_ethereum::{
 };
 
 use crate::{Chain, DataSource};
-const ETH_CALL_GAS: u32 = 50_000_000;
 
 pub struct RuntimeAdapter {
     pub eth_adapters: Arc<EthereumNetworkAdapters>,

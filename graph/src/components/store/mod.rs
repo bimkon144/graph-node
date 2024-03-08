@@ -3,6 +3,7 @@ mod err;
 mod traits;
 pub mod write;
 
+use diesel_derives::Queryable;
 pub use entity_cache::{EntityCache, EntityLfuCache, GetScope, ModificationsAndCache};
 use futures03::future::{FutureExt, TryFutureExt};
 use slog::{trace, Logger};
@@ -866,6 +867,53 @@ impl DeploymentId {
     pub fn new(id: i32) -> Self {
         Self(id)
     }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct SubgraphSegmentId(pub i32);
+
+/// A segment refers to a deployment block range. It is used to limit the scope of the store
+/// components to the specific range. This is used for parallel operations targetting the same
+/// deployment. The use of `DeploymentSegment::default()` maintains the current behaviour of
+/// full access to the entire DeploymentStore.
+#[derive(Clone, Debug)]
+pub enum SubgraphSegment {
+    AllBlocks,
+    Range(SegmentDetails),
+}
+
+impl Default for SubgraphSegment {
+    fn default() -> Self {
+        Self::AllBlocks
+    }
+}
+
+impl SubgraphSegment {
+    pub fn end_block(&self) -> Option<BlockNumber> {
+        match self {
+            SubgraphSegment::AllBlocks => None,
+            SubgraphSegment::Range(details) => Some(details.end_block),
+        }
+    }
+
+    pub fn is_complete(&self) -> bool {
+        match self {
+            Self::Range(details) if details.current_block.is_some() => {
+                details.end_block == details.current_block.unwrap()
+            }
+            _ => false,
+        }
+    }
+}
+
+/// Each segment represents a block range within a subgraph. End block is exclusive.
+#[derive(Clone, Debug, Queryable)]
+pub struct SegmentDetails {
+    pub id: SubgraphSegmentId,
+    pub deployment: DeploymentId,
+    pub start_block: BlockNumber,
+    pub end_block: BlockNumber,
+    pub current_block: Option<BlockNumber>,
 }
 
 /// A unique identifier for a deployment that specifies both its external

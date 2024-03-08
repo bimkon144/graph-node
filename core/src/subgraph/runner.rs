@@ -23,7 +23,9 @@ use graph::data_source::{
     offchain, CausalityRegion, DataSource, DataSourceCreationError, TriggerData,
 };
 use graph::env::EnvVars;
-use graph::indexer::store::{SledIndexerStore, SledStoreError, StateSnapshotFrequency, DB_NAME};
+use graph::indexer::store::{
+    PostgresIndexerDB, SledIndexerStore, SledStoreError, StateSnapshotFrequency, DB_NAME,
+};
 use graph::indexer::{IndexWorker, IndexerContext};
 use graph::prelude::*;
 use graph::schema::EntityKey;
@@ -200,45 +202,8 @@ where
         loop {
             debug!(self.logger, "Starting or restarting subgraph");
 
-            // let db = Arc::new(sled::open(DB_NAME).map_err(SledStoreError::from).unwrap());
-            // let store = Arc::new(
-            //     SledIndexerStore::new(
-            //         db,
-            //         self.inputs.deployment.hash.as_str(),
-            //         StateSnapshotFrequency::Never,
-            //     )
-            //     .unwrap(),
-            // );
-
-            // let ctx = Arc::new(IndexerContext {
-            //     chain: self.inputs.chain.clone(),
-            //     transform: Arc::new(UniswapTransform::new()),
-            //     store,
-            //     deployment: self.inputs.deployment.clone(),
-            // });
-
-            // let iw = IndexWorker {};
-
             // TriggerFilter needs to be rebuilt eveytime the blockstream is restarted
             self.ctx.filter = Some(self.build_filter());
-
-            // let earlier = Instant::now();
-            // iw.run_many(
-            //     ctx,
-            //     self.inputs.store.clone(),
-            //     *self.inputs.start_blocks.iter().min().unwrap(),
-            //     // Some(13369621),
-            //     None,
-            //     Arc::new(self.ctx.filter.as_ref().unwrap().clone()),
-            //     self.inputs.unified_api_version.clone(),
-            //     40,
-            // )
-            // .await
-            // .unwrap();
-            // let diff = Instant::now().duration_since(earlier);
-            // println!("### All tasks finished: took {}s ###", diff.as_secs());
-
-            // panic!("finished ingesting data");
 
             let block_stream_canceler = CancelGuard::new();
             let block_stream_cancel_handle = block_stream_canceler.handle();
@@ -306,6 +271,50 @@ where
                 };
             }
         }
+    }
+
+    async fn populate_dataset(&mut self) {
+        // let db = Arc::new(sled::open(DB_NAME).map_err(SledStoreError::from).unwrap());
+        // let store = Arc::new(
+        //     SledIndexerStore::new(
+        //         db,
+        //         self.inputs.deployment.hash.as_str(),
+        //         StateSnapshotFrequency::Never,
+        //     )
+        //     .unwrap(),
+        // );
+        // let db = Arc::new(sled::open(DB_NAME).map_err(SledStoreError::from).unwrap());
+        // self.inputs.store
+
+        let store = Arc::new(PostgresIndexerDB::new(
+            self.inputs.store.cheap_clone(),
+            self.inputs.deployment.cheap_clone(),
+        ));
+
+        let ctx = Arc::new(IndexerContext {
+            chain: self.inputs.chain.clone(),
+            transform: Arc::new(UniswapTransform::new()),
+            store,
+            deployment: self.inputs.deployment.clone(),
+        });
+
+        let iw = IndexWorker {};
+
+        let earlier = Instant::now();
+        iw.run_many(
+            ctx,
+            self.inputs.store.clone(),
+            *self.inputs.start_blocks.iter().min().unwrap(),
+            // Some(13369621),
+            None,
+            Arc::new(self.ctx.filter.as_ref().unwrap().clone()),
+            self.inputs.unified_api_version.clone(),
+            40,
+        )
+        .await
+        .unwrap();
+        let diff = Instant::now().duration_since(earlier);
+        println!("### All tasks finished: took {}s ###", diff.as_secs());
     }
 
     /// Processes a block and returns the updated context and a boolean flag indicating

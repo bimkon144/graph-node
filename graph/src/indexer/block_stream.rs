@@ -1,7 +1,7 @@
 use crate::blockchain::block_stream::{
     BlockStream, BlockStreamError, BlockStreamEvent, FirehoseCursor,
 };
-use crate::blockchain::{BlockTime, Blockchain, TriggerFilter};
+use crate::blockchain::{BlockTime, Blockchain};
 use crate::prelude::*;
 use crate::util::backoff::ExponentialBackoff;
 use async_stream::try_stream;

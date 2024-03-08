@@ -1,17 +1,30 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 
 use crate::anyhow::Result;
 use crate::blockchain::BlockPtr;
+use crate::components::store::{DeploymentLocator, WritableStore};
 use crate::indexer::{BlockSender, EncodedTriggers, State};
 use crate::{components::store::BlockNumber, indexer::IndexerStore};
 
-struct PostgresIndexerDB {}
+pub struct PostgresIndexerDB {
+    store: Arc<dyn WritableStore>,
+    deployment: DeploymentLocator,
+}
+
+impl PostgresIndexerDB {
+    pub fn new(store: Arc<dyn WritableStore>, deployment: DeploymentLocator) -> Self {
+        Self { store, deployment }
+    }
+}
 
 #[async_trait]
 impl IndexerStore for PostgresIndexerDB {
     async fn get_last_stable_block(&self) -> Result<Option<BlockNumber>> {
-        unimplemented!()
+        Ok(self.store.block_ptr().map(|b| b.block_number()))
     }
+
     async fn stream_from(&self, bn: BlockNumber, bs: BlockSender) -> Result<()> {
         unimplemented!()
     }

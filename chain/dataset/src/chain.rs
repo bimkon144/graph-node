@@ -2,11 +2,8 @@ use crate::runtime::RuntimeAdapter;
 use crate::{data_source::*, TriggerData, TriggerFilter, TriggersAdapter};
 use anyhow::{anyhow, Error};
 use graph::blockchain::client::ChainClient;
-use graph::blockchain::{
-    BasicBlockchainBuilder, BlockIngestor, BlockTime, EmptyNodeCapabilities, NoopRuntimeAdapter,
-};
+use graph::blockchain::{BlockIngestor, BlockTime, EmptyNodeCapabilities, NoopRuntimeAdapter};
 use graph::components::store::DeploymentCursorTracker;
-use graph::env::EnvVars;
 use graph::indexer::block_stream::IndexerBlockStream;
 use graph::indexer::store::{SledIndexerStore, DB_NAME};
 use graph::prelude::{
@@ -54,8 +51,8 @@ impl blockchain::Block for Block {
 pub struct Chain {
     pub(crate) eth_adapters: Option<Arc<EthereumNetworkAdapters>>,
     pub(crate) call_cache: Arc<dyn EthereumCallCache>,
-    pub(crate) logger_factory: LoggerFactory,
-    pub(crate) metrics_registry: Arc<MetricsRegistry>,
+    pub(crate) _logger_factory: LoggerFactory,
+    pub(crate) _metrics_registry: Arc<MetricsRegistry>,
 }
 
 impl Chain {
@@ -66,8 +63,8 @@ impl Chain {
         metrics_registry: Arc<MetricsRegistry>,
     ) -> Self {
         Self {
-            logger_factory,
-            metrics_registry,
+            _logger_factory: logger_factory,
+            _metrics_registry: metrics_registry,
             eth_adapters,
             call_cache: eth_call_cache,
         }

@@ -21,13 +21,14 @@
         - [] remove clone
 - [] Uniswap toy example
 - [] perf tests
-    - [] consume all the blocks in parallel, empty transform
-    - [] block stream from kv to run subgraph
-    - [] minimal uniswap example using new architecture
+    - [x] consume all the blocks in parallel, empty transform
+    - [x] block stream from kv to run subgraph
+    - [x] minimal uniswap example using new architecture
 - [] binary to check data?
 - [] test different stores
     - [] postgres? 
     - [] rocksdb 
+    - [x] sleddb
 - [] dataset blockstream
     - [] try to avoid cloning the handler every block
 - [] cleanup println and unwrap
@@ -37,4 +38,8 @@
 - [] DataSet Blockchain
     - [] How to get the ethereum/others network_names and configs?
     - [] Fix datasource hack
-
+- [] Store
+    - [] Make it not forward only
+    - [] Introduce partitions? 
+    - [] Get all keys
+    - [] Write entity update

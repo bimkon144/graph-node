@@ -17,7 +17,7 @@ use graph::{
         server::index_node::VersionInfo,
         store::{
             self, BlockPtrForNumber, BlockStore, DeploymentLocator, EnsLookup as EnsLookupTrait,
-            PruneReporter, PruneRequest, SubgraphFork,
+            PruneReporter, PruneRequest, SubgraphFork, SubgraphSegment,
         },
     },
     constraint_violation,
@@ -38,7 +38,7 @@ use graph::{
 use crate::{
     connection_pool::ConnectionPool,
     deployment::{OnSync, SubgraphHealth},
-    primary,
+    primary::{self},
     primary::{DeploymentId, Mirror as PrimaryMirror, Site},
     relational::{index::Method, Layout},
     writable::WritableStore,
@@ -1434,6 +1434,7 @@ impl SubgraphStoreTrait for SubgraphStore {
         self: Arc<Self>,
         logger: Logger,
         deployment: graph::components::store::DeploymentId,
+        segment: SubgraphSegment,
         manifest_idx_and_name: Arc<Vec<(u32, String)>>,
     ) -> Result<Arc<dyn store::WritableStore>, StoreError> {
         let deployment = deployment.into();
@@ -1462,6 +1463,7 @@ impl SubgraphStoreTrait for SubgraphStore {
                 self.as_ref().clone(),
                 logger,
                 site,
+                segment,
                 manifest_idx_and_name,
                 self.registry.clone(),
             )
