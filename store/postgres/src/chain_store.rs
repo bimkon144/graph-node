@@ -72,7 +72,7 @@ pub use data::Storage;
 
 /// Encapuslate access to the blocks table for a chain.
 mod data {
-    use diesel::sql_types::{Array, Binary};
+    use diesel::sql_types::{Array, Binary, Bool};
     use diesel::{connection::SimpleConnection, insert_into};
     use diesel::{delete, prelude::*, sql_query};
     use diesel::{dsl::sql, pg::PgConnection};
@@ -1109,6 +1109,57 @@ mod data {
                     .map_err(Error::from),
             }
             .map(|row| row.map(|(return_value, expired)| (Bytes::from(return_value), expired)))
+        }
+
+        pub(super) fn get_calls_and_access(
+            &self,
+            conn: &PgConnection,
+            ids: &[&[u8]],
+        ) -> Result<Vec<(Vec<u8>, Bytes, bool)>, Error> {
+            let rows = match self {
+                Storage::Shared => {
+                    use public::eth_call_cache as cache;
+                    use public::eth_call_meta as meta;
+
+                    cache::table
+                        .inner_join(meta::table)
+                        .filter(cache::id.eq_any(ids))
+                        .select((
+                            cache::id,
+                            cache::return_value,
+                            sql::<Bool>("CURRENT_DATE > eth_call_meta.accessed_at"),
+                        ))
+                        .load(conn)
+                        .map_err(Error::from)
+                }
+                Storage::Private(Schema {
+                    call_cache,
+                    call_meta,
+                    ..
+                }) => call_cache
+                    .table()
+                    .inner_join(
+                        call_meta.table().on(call_meta
+                            .contract_address()
+                            .eq(call_cache.contract_address())),
+                    )
+                    .filter(call_cache.id().eq_any(ids))
+                    .select((
+                        call_cache.id(),
+                        call_cache.return_value(),
+                        sql(&format!(
+                            "CURRENT_DATE > {}.{}",
+                            CallMetaTable::TABLE_NAME,
+                            CallMetaTable::ACCESSED_AT
+                        )),
+                    ))
+                    .load::<(Vec<u8>, Vec<u8>, bool)>(conn)
+                    .map_err(Error::from),
+            }?;
+            Ok(rows
+                .into_iter()
+                .map(|(id, return_value, expired)| (id, Bytes::from(return_value), expired))
+                .collect())
         }
 
         pub(super) fn get_calls_in_block(
@@ -2336,6 +2387,45 @@ impl EthereumCallCache for ChainStore {
             req.cheap_clone()
                 .response(call::Retval::Value(return_value), call::Source::Store)
         }))
+    }
+
+    fn get_calls(
+        &self,
+        reqs: &[call::Request],
+        block: BlockPtr,
+    ) -> Result<(Vec<call::Response>, Vec<call::Request>), Error> {
+        let ids: Vec<_> = reqs
+            .into_iter()
+            .map(|req| contract_call_id(req, &block))
+            .collect();
+        let id_refs: Vec<_> = ids.iter().map(|id| id.as_slice()).collect();
+
+        let conn = &*self.get_conn()?;
+        let rows =
+            conn.transaction::<_, Error, _>(|| self.storage.get_calls_and_access(conn, &id_refs))?;
+
+        let mut found: Vec<usize> = Vec::new();
+        let mut resps = Vec::new();
+        for (id, retval, _) in rows {
+            let idx = ids.iter().position(|i| i.as_ref() == id).ok_or_else(|| {
+                constraint_violation!(
+                    "get_calls returned a call id that was not requested: {}",
+                    hex::encode(id)
+                )
+            })?;
+            found.push(idx);
+            let resp = reqs[idx]
+                .cheap_clone()
+                .response(call::Retval::Value(retval), call::Source::Store);
+            resps.push(resp);
+        }
+        let calls = reqs
+            .into_iter()
+            .enumerate()
+            .filter(|(idx, _)| !found.contains(&idx))
+            .map(|(_, call)| call.cheap_clone())
+            .collect();
+        Ok((resps, calls))
     }
 
     fn get_calls_in_block(&self, block: BlockPtr) -> Result<Vec<CachedEthereumCall>, Error> {
