@@ -1683,7 +1683,7 @@ impl<'a> Filter<'a> {
                     out.push_sql(") > 0");
                 }
             }
-            SqlValue::List(_) => {
+            SqlValue::List(_) | SqlValue::Numerics(_) => {
                 if op.negated() {
                     out.push_sql(" not ");
                     column.walk_ast(out.reborrow())?;
@@ -1697,7 +1697,6 @@ impl<'a> Filter<'a> {
             SqlValue::Null
             | SqlValue::Bool(_)
             | SqlValue::Numeric(_)
-            | SqlValue::Numerics(_)
             | SqlValue::Int(_)
             | SqlValue::Int8(_) => {
                 let filter = match op.negated() {
