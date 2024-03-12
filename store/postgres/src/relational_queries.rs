@@ -1656,7 +1656,7 @@ impl<'a> Filter<'a> {
         mut out: AstPass<'_, 'b, Pg>,
     ) -> QueryResult<()> {
         match &qv.value {
-            SqlValue::String(_) | SqlValue::Text(_) => {
+            SqlValue::String(_) | SqlValue::Text(_) | SqlValue::Numeric(_) => {
                 column.walk_ast(out.reborrow())?;
                 op.walk_ast(out.reborrow())?;
                 qv.walk_ast(out.reborrow())?;
@@ -1694,11 +1694,7 @@ impl<'a> Filter<'a> {
                 }
                 qv.walk_ast(out)?;
             }
-            SqlValue::Null
-            | SqlValue::Bool(_)
-            | SqlValue::Numeric(_)
-            | SqlValue::Int(_)
-            | SqlValue::Int8(_) => {
+            SqlValue::Null | SqlValue::Bool(_) | SqlValue::Int(_) | SqlValue::Int8(_) => {
                 let filter = match op.negated() {
                     false => "contains",
                     true => "not_contains",
