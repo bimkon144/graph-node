@@ -1179,8 +1179,6 @@ async fn main() -> anyhow::Result<()> {
             commands::assign::reassign(ctx.primary_pool(), &sender, &deployment, node)
         }
         Pause { deployment } => {
-            let ctx_clone = ctx.clone();
-
             let sender = ctx.notification_sender();
             let pool = ctx.primary_pool();
             commands::assign::pause_or_resume(
